@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 
 class_path=/sys/class/evox2_ec
-declare -a fan1_rpms
-declare -a fan2_rpms
-declare -a fan3_rpms
+declare -a fan1_rpms fan2_rpms fan3_rpms
+declare -a original_modes original_levels
+
+echo "Saving original fan settings..."
+for i in {1..3}; do
+    original_modes[$i]=$(cat $class_path/fan$i/mode)
+    original_levels[$i]=$(cat $class_path/fan$i/level)
+    echo "Fan $i: mode=${original_modes[$i]}, level=${original_levels[$i]}"
+done
+echo "------------------------"
 
 echo "Setting fans to fixed mode..."
 echo fixed | tee $class_path/fan{1..3}/mode > /dev/null
@@ -26,8 +33,12 @@ for level in {0..5}; do
     echo "------------------------"
 done
 
-echo "Setting fans back to auto mode..."
-echo auto | tee $class_path/fan{1..3}/mode > /dev/null
+echo "Restoring original fan settings..."
+for i in {1..3}; do
+    echo "${original_modes[$i]}" > $class_path/fan$i/mode
+    echo "${original_levels[$i]}" > $class_path/fan$i/level
+    echo "Fan $i restored to: mode=${original_modes[$i]}, level=${original_levels[$i]}"
+done
 
 # Generate report
 echo "
