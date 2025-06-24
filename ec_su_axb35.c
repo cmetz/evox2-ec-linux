@@ -37,17 +37,28 @@ struct ec_temp {
     struct device *dev;
 };
 
+struct ec_agpu {
+    const char *name;
+    u8 power_mode_reg;
+    struct device *dev;
+};
+
 static struct class *ec_class;
 
 static struct ec_fan ec_fans[] = {
-    { .name = "fan1", .speed_reg_high = 0x35, .speed_reg_low = 0x36, .mode_reg = 0x21, .rampup_curve = {0,40,50,60,70,80} , .rampdown_curve = {0,35,45,55,65,75} },
-    { .name = "fan2", .speed_reg_high = 0x37, .speed_reg_low = 0x38, .mode_reg = 0x23, .rampup_curve = {0,40,50,60,70,80} , .rampdown_curve = {0,35,45,55,65,75} },
-    { .name = "fan3", .speed_reg_high = 0x28, .speed_reg_low = 0x29, .mode_reg = 0x25, .rampup_curve = {0,40,50,60,70,80} , .rampdown_curve = {0,35,45,55,65,75} },
+    { .name = "fan1", .speed_reg_high = 0x35, .speed_reg_low = 0x36, .mode_reg = 0x21, .rampup_curve = {0,60,70,83,95,97} , .rampdown_curve = {0,40,50,80,94,96} },
+    { .name = "fan2", .speed_reg_high = 0x37, .speed_reg_low = 0x38, .mode_reg = 0x23, .rampup_curve = {0,60,70,83,95,97} , .rampdown_curve = {0,40,50,80,94,96} },
+    { .name = "fan3", .speed_reg_high = 0x28, .speed_reg_low = 0x29, .mode_reg = 0x25, .rampup_curve = {0,20,60,83,95,97} , .rampdown_curve = {0, 0,50,80,94,96} },
 };
 
 static struct ec_temp ec_temp = {
     .name = "temp1",
     .reg = 0x70,
+};
+
+static struct ec_agpu ec_agpu = {
+    .name = "agpu",
+    .power_mode_reg = 0x31,
 };
 
 static ssize_t fan_rpm_show(struct device *dev,
@@ -348,6 +359,52 @@ static ssize_t temp_max_show(struct device *dev,
 
 static struct device_attribute dev_attr_temp_max = __ATTR(max, 0444, temp_max_show, NULL);
 
+static ssize_t agpu_power_mode_show(struct device *dev,
+                            struct device_attribute *attr, char *buf)
+{
+    struct ec_agpu *agpu = dev_get_drvdata(dev);
+    u8 val;
+    // TODO: handle error
+    ec_read(agpu->power_mode_reg, &val);
+
+    const char *mode = "unknown";
+    switch (val) {
+        case 0x00:
+            mode = "balanced"; break;
+        case 0x01:
+            mode = "performance"; break;
+        case 0x02:
+            mode = "quiet"; break;
+        default:
+            return -EINVAL;
+    }
+
+    return sprintf(buf, "%s\n", mode);
+}
+
+static ssize_t agpu_power_mode_store(struct device *dev,
+                           struct device_attribute *attr,
+                           const char *buf, size_t count)
+{
+    struct ec_agpu *agpu = dev_get_drvdata(dev);
+    u8 val;
+    if (sysfs_streq(buf, "balanced")) {
+        val = 0x00;
+    } else if (sysfs_streq(buf, "performance")) {
+        val = 0x01;
+    } else if (sysfs_streq(buf, "quiet")) {
+        val = 0x02;
+    } else {
+        return -EINVAL;
+    }
+
+    ec_write(agpu->power_mode_reg, val);
+    return count;
+}
+
+static struct device_attribute dev_attr_agpu_power_mode = __ATTR(power_mode, 0644, agpu_power_mode_show, agpu_power_mode_store);
+
+
 static struct delayed_work ec_update_work;
 
 static void ec_update_worker(struct work_struct *work)
@@ -389,7 +446,7 @@ static int __init ec_su_axb35_init(void)
     int i;
     int ret;
 
-    ret = alloc_chrdev_region(&ec_su_axb35_dev, 0, ARRAY_SIZE(ec_fans) + 1, "ec_su_axb35");
+    ret = alloc_chrdev_region(&ec_su_axb35_dev, 0, ARRAY_SIZE(ec_fans) + 2, "ec_su_axb35");
     if (ret <0) {
         pr_err("ec_su_axb35: Failed to allocation major number\n");
         return ret;
@@ -402,7 +459,7 @@ static int __init ec_su_axb35_init(void)
     #endif
 
     if (IS_ERR(ec_class)) {
-        unregister_chrdev_region(ec_su_axb35_dev, ARRAY_SIZE(ec_fans) + 1);
+        unregister_chrdev_region(ec_su_axb35_dev, ARRAY_SIZE(ec_fans) + 2);
         return PTR_ERR(ec_class);
     }
 
@@ -428,6 +485,12 @@ static int __init ec_su_axb35_init(void)
         device_create_file(ec_temp.dev, &dev_attr_temp_cur);
         device_create_file(ec_temp.dev, &dev_attr_temp_min);
         device_create_file(ec_temp.dev, &dev_attr_temp_max);
+    }
+
+    ec_agpu.dev = device_create(ec_class, NULL, MKDEV(MAJOR(ec_su_axb35_dev), ARRAY_SIZE(ec_fans) + 1), &ec_agpu, ec_agpu.name);
+    if (!IS_ERR(ec_agpu.dev)) {
+        dev_set_drvdata(ec_agpu.dev, &ec_agpu);
+        device_create_file(ec_agpu.dev, &dev_attr_agpu_power_mode);
     }
 
     INIT_DELAYED_WORK(&ec_update_work, ec_update_worker);
@@ -458,10 +521,15 @@ static void __exit ec_su_axb35_exit(void)
         device_destroy(ec_class, MKDEV(MAJOR(ec_su_axb35_dev), ARRAY_SIZE(ec_fans)));
     }
 
+    if (!IS_ERR(ec_agpu.dev)) {
+        device_remove_file(ec_agpu.dev, &dev_attr_agpu_power_mode);
+        device_destroy(ec_class, MKDEV(MAJOR(ec_su_axb35_dev), ARRAY_SIZE(ec_fans) + 1));
+    }
+
     cancel_delayed_work_sync(&ec_update_work);
 
     class_destroy(ec_class);
-    unregister_chrdev_region(ec_su_axb35_dev, ARRAY_SIZE(ec_fans) + 1);
+    unregister_chrdev_region(ec_su_axb35_dev, ARRAY_SIZE(ec_fans) + 2);
     pr_info("ec_su_axb35: Modul unloaded\n");
 }
 
