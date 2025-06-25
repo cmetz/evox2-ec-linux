@@ -6,22 +6,42 @@ declare -a axb35_vars
 
 # main metrics function
 axb35_get() {
-  if [ -d $axb35_path ]; then
-    mapfile -t axb35_vars < <(cat $axb35_path/fan{1..3}/rpm $axb35_path/fan{1..3}/mode $axb35_path/fan{1..3}/level $axb35_path/temp1/{temp,min,max})
-    for i in {3..5}; do
-      if [ ${axb35_vars[i]} == "auto" ]; then
-        axb35_vars[i]=1
-        axb35_vars[(($i+3))]=6
-      elif [ ${axb35_vars[i]} == "curve" ]; then
-        axb35_vars[i]=2
-      else
-        axb35_vars[i]=3
-      fi
-    done
-    return 0
-  else
+  if [ ! -d $axb35_path ]; then
     return 1
   fi
+
+  # read all values from the module
+  mapfile -t axb35_vars < <(
+    cat \
+      $axb35_path/fan{1..3}/rpm \
+      $axb35_path/fan{1..3}/mode \
+      $axb35_path/fan{1..3}/level \
+      $axb35_path/temp1/{temp,min,max} \
+      $axb35_path/apu/power_mode
+  )
+  
+  # convert fan modes to numeric values
+  for i in {3..5}; do
+    case "${axb35_vars[i]}" in
+      "fixed") axb35_vars[i]=3 ;;
+      "curve") axb35_vars[i]=2 ;;
+      "auto")
+        axb35_vars[i]=1
+        axb35_vars[(($i+3))]=6
+        ;;
+      *) axb35_vars[i]=0 ;; # unknown mode
+    esac
+  done
+  
+  # convert power mode to numeric value
+  case "${axb35_vars[12]}" in
+    "performance") axb35_vars[12]=3 ;;
+    "balanced")    axb35_vars[12]=2 ;;
+    "quiet")       axb35_vars[12]=1 ;;
+    *)             axb35_vars[12]=0 ;; # unknown mode
+  esac
+  
+  return 0
 }
 
 # called once to find out if this chart should be enabled or not
@@ -49,6 +69,8 @@ CHART axb35.fanlevel 'axb354' "Fan Power Levels (6 = Auto)" "Level" "Fan Power L
 DIMENSION fan1level '' absolute 1 1
 DIMENSION fan2level '' absolute 1 1
 DIMENSION fan3level '' absolute 1 1
+CHART axb35.powermode 'axb355' "Power Mode (1 = Quiet, 2 = Balanced, 3 = Performance)" "Mode" "Power Modes" '' line $((axb35_priority+4)) $axb35_update_every '' '' 'axb35'
+DIMENSION powermode '' absolute 1 1
 EOF
 
   return 0
@@ -78,6 +100,9 @@ BEGIN axb35.cputemp $1
 SET cputemp = ${axb35_vars[9]}
 SET cputempmin = ${axb35_vars[10]}
 SET cputempmax = ${axb35_vars[11]}
+END
+BEGIN axb35.powermode $1
+SET powermode = ${axb35_vars[12]}
 END
 
 VALUESEOF
