@@ -18,7 +18,7 @@ install: all
 uninstall:
 	@if [ -n "$(MODULE_INSTALLED_PATH)" ]; then \
 		echo "Removing $(MODULE_INSTALLED_PATH)"; \
-		rm -v "$(MODULE_PATH)"; \
+		rm -v "$(MODULE_INSTALLED_PATH)"; \
 		depmod; \
 	else \
 		echo "Module not found."; \
