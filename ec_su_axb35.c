@@ -37,7 +37,7 @@ struct ec_temp {
     struct device *dev;
 };
 
-struct ec_agpu {
+struct ec_apu {
     const char *name;
     u8 power_mode_reg;
     struct device *dev;
@@ -56,8 +56,8 @@ static struct ec_temp ec_temp = {
     .reg = 0x70,
 };
 
-static struct ec_agpu ec_agpu = {
-    .name = "agpu",
+static struct ec_apu ec_apu = {
+    .name = "apu",
     .power_mode_reg = 0x31,
 };
 
@@ -359,13 +359,13 @@ static ssize_t temp_max_show(struct device *dev,
 
 static struct device_attribute dev_attr_temp_max = __ATTR(max, 0444, temp_max_show, NULL);
 
-static ssize_t agpu_power_mode_show(struct device *dev,
+static ssize_t apu_power_mode_show(struct device *dev,
                             struct device_attribute *attr, char *buf)
 {
-    struct ec_agpu *agpu = dev_get_drvdata(dev);
+    struct ec_apu *apu = dev_get_drvdata(dev);
     u8 val;
     // TODO: handle error
-    ec_read(agpu->power_mode_reg, &val);
+    ec_read(apu->power_mode_reg, &val);
 
     const char *mode = "unknown";
     switch (val) {
@@ -382,11 +382,11 @@ static ssize_t agpu_power_mode_show(struct device *dev,
     return sprintf(buf, "%s\n", mode);
 }
 
-static ssize_t agpu_power_mode_store(struct device *dev,
+static ssize_t apu_power_mode_store(struct device *dev,
                            struct device_attribute *attr,
                            const char *buf, size_t count)
 {
-    struct ec_agpu *agpu = dev_get_drvdata(dev);
+    struct ec_apu *apu = dev_get_drvdata(dev);
     u8 val;
     if (sysfs_streq(buf, "balanced")) {
         val = 0x00;
@@ -398,11 +398,11 @@ static ssize_t agpu_power_mode_store(struct device *dev,
         return -EINVAL;
     }
 
-    ec_write(agpu->power_mode_reg, val);
+    ec_write(apu->power_mode_reg, val);
     return count;
 }
 
-static struct device_attribute dev_attr_agpu_power_mode = __ATTR(power_mode, 0644, agpu_power_mode_show, agpu_power_mode_store);
+static struct device_attribute dev_attr_apu_power_mode = __ATTR(power_mode, 0644, apu_power_mode_show, apu_power_mode_store);
 
 
 static struct delayed_work ec_update_work;
@@ -487,10 +487,10 @@ static int __init ec_su_axb35_init(void)
         device_create_file(ec_temp.dev, &dev_attr_temp_max);
     }
 
-    ec_agpu.dev = device_create(ec_class, NULL, MKDEV(MAJOR(ec_su_axb35_dev), ARRAY_SIZE(ec_fans) + 1), &ec_agpu, ec_agpu.name);
-    if (!IS_ERR(ec_agpu.dev)) {
-        dev_set_drvdata(ec_agpu.dev, &ec_agpu);
-        device_create_file(ec_agpu.dev, &dev_attr_agpu_power_mode);
+    ec_apu.dev = device_create(ec_class, NULL, MKDEV(MAJOR(ec_su_axb35_dev), ARRAY_SIZE(ec_fans) + 1), &ec_apu, ec_apu.name);
+    if (!IS_ERR(ec_apu.dev)) {
+        dev_set_drvdata(ec_apu.dev, &ec_apu);
+        device_create_file(ec_apu.dev, &dev_attr_apu_power_mode);
     }
 
     INIT_DELAYED_WORK(&ec_update_work, ec_update_worker);
@@ -521,8 +521,8 @@ static void __exit ec_su_axb35_exit(void)
         device_destroy(ec_class, MKDEV(MAJOR(ec_su_axb35_dev), ARRAY_SIZE(ec_fans)));
     }
 
-    if (!IS_ERR(ec_agpu.dev)) {
-        device_remove_file(ec_agpu.dev, &dev_attr_agpu_power_mode);
+    if (!IS_ERR(ec_apu.dev)) {
+        device_remove_file(ec_apu.dev, &dev_attr_apu_power_mode);
         device_destroy(ec_class, MKDEV(MAJOR(ec_su_axb35_dev), ARRAY_SIZE(ec_fans) + 1));
     }
 
