@@ -15,7 +15,6 @@ install: all
 	$(MAKE) -C $(KERNEL_BUILD) M=$(PWD) modules_install
 	depmod
 
-
 uninstall:
 	@if [ -n "$(MODULE_INSTALLED_PATH)" ]; then \
 		echo "Removing $(MODULE_INSTALLED_PATH)"; \
