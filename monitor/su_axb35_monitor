@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+
+axb35_path=/sys/class/ec_su_axb35
+declare -a axb35_vars
+
+# ANSI colors and formatting
+RESET="\033[0m"
+BOLD="\033[1m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BLUE="\033[34m"
+CYAN="\033[36m"
+RED="\033[31m"
+MAGENTA="\033[35m"
+
+# magic numbers to navigate the array
+fan1rpm=0    fan2rpm=1   fan3rpm=2
+fan1mode=3   fan2mode=4  fan3mode=5
+fan1level=6  fan2level=7 fan3level=8
+fan1ru=9     fan2ru=10   fan3ru=11
+fan1rd=12    fan2rd=13   fan3rd=14
+temp=15      min=16      max=17
+powermode=18
+
+# Function to get all needed values
+get_current_state() {
+    mapfile -t axb35_vars < <(
+    cat \
+        $axb35_path/fan{1..3}/rpm \
+        $axb35_path/fan{1..3}/mode \
+        $axb35_path/fan{1..3}/level \
+        $axb35_path/fan{1..3}/rampup_curve \
+        $axb35_path/fan{1..3}/rampdown_curve \
+        $axb35_path/temp1/{temp,min,max} \
+        $axb35_path/apu/power_mode
+    )
+}
+
+# Function to format the RPM value with color based on speed
+format_rpm() {
+    local rpm=$1
+    if (( rpm < 1200 )); then
+        echo -e "${GREEN}${rpm}${RESET}"
+    elif (( rpm < 3000 )); then
+        echo -e "${YELLOW}${rpm}${RESET}"
+    else
+        echo -e "${RED}${rpm}${RESET}"
+    fi
+}
+
+# Function to format the temperature with color
+format_temp() {
+    local temp=$1
+    if (( temp < 50 )); then
+        echo -e "${GREEN}${temp}${RESET}"
+    elif (( temp < 70 )); then
+        echo -e "${YELLOW}${temp}${RESET}"
+    else
+        echo -e "${RED}${temp}${RESET}"
+    fi
+}
+
+# Function to format the mode with color
+format_mode() {
+    local mode=$1
+    case "$mode" in
+        "auto")  echo -e "${GREEN}${mode}${RESET}" ;;
+        "fixed") echo -e "${YELLOW}${mode}${RESET}" ;;
+        "curve") echo -e "${CYAN}${mode}${RESET}" ;;
+        *) echo -e "${mode}" ;;
+    esac
+}
+
+# Function to format the power mode with color
+format_power_mode() {
+    local mode=$1
+    case "$mode" in
+        "quiet")       echo -e "${GREEN}${mode}${RESET}" ;;
+        "balanced")    echo -e "${YELLOW}${mode}${RESET}" ;;
+        "performance") echo -e "${RED}${mode}${RESET}" ;;
+        *) echo -e "${mode}" ;;
+    esac
+}
+
+# Function to display fan information in a formatted way
+display_fan_info() {
+    local fan_num=$1
+    local rpm_idx=$2
+    local mode_idx=$3
+    local level_idx=$4
+    local ru_idx=$5
+    local rd_idx=$6
+    local fan_name=$7
+    
+    echo -e "${BOLD}${fan_name}${RESET}"
+    echo -e "  Speed: $(format_rpm ${axb35_vars[$rpm_idx]}) RPM"
+    echo -e "  Mode:  $(format_mode ${axb35_vars[$mode_idx]})"
+    
+    if [[ "${axb35_vars[$mode_idx]}" == "curve" ]]; then
+        echo -e "  Level: N/A"
+    else
+        echo -e "  Level: ${axb35_vars[$level_idx]}"
+    fi
+    
+    if [[ "${axb35_vars[$mode_idx]}" == "curve" ]]; then
+        echo -e "  Ramp Up Curve:   ${axb35_vars[$ru_idx]}"
+        echo -e "  Ramp Down Curve: ${axb35_vars[$rd_idx]}"
+    else
+        echo -e "  Ramp Up Curve:   N/A"
+        echo -e "  Ramp Down Curve: N/A"
+    fi
+    echo ""
+}
+
+# Function to display all the information
+display_system_info() {
+    # Position cursor at top left
+    tput cup 0 0
+    tput ed
+    
+    # Get terminal size
+    local term_rows=$(tput lines)
+    local term_cols=$(tput cols)
+    
+    # Current timestamp
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    
+    # Display title first at the top of the screen
+    echo -e "${BOLD}${MAGENTA}=== AXB35 System Monitor ===${RESET} (Updated: ${timestamp})\n"
+    
+    # Calculate the mid-point for two-column layout
+    local mid_col=$((term_cols / 2 - 5))
+    
+    # Save cursor position after title
+    local start_row
+    start_row=$(tput lines)
+    
+    # Fans
+    display_fan_info 1 $fan1rpm $fan1mode $fan1level $fan1ru $fan1rd "CPU Fan 1"
+    display_fan_info 2 $fan2rpm $fan2mode $fan2level $fan2ru $fan2rd "CPU Fan 2"
+    display_fan_info 3 $fan3rpm $fan3mode $fan3level $fan3ru $fan3rd "System Fan"
+    
+    # Temps
+    tput cup 3 $mid_col
+    echo -e "${BOLD}Temperature${RESET}"
+    tput cup 4 $mid_col
+    echo -e "  Current: $(format_temp ${axb35_vars[$temp]}) °C"
+    tput cup 5 $mid_col
+    echo -e "  Min:     $(format_temp ${axb35_vars[$min]}) °C"
+    tput cup 6 $mid_col
+    echo -e "  Max:     $(format_temp ${axb35_vars[$max]}) °C"
+    
+    # APU power mode
+    tput cup 9 $mid_col
+    echo -e "${BOLD}APU Power Mode${RESET}"
+    tput cup 10 $mid_col
+    echo -e "  Mode: $(format_power_mode ${axb35_vars[$powermode]})"
+    tput cup 11 $mid_col
+    echo ""
+    
+    # prompt
+    local available_rows=$((term_rows -2))
+    tput cup $available_rows 0
+    echo -e "${BOLD}${BLUE}Press Ctrl+C to exit${RESET}"
+}
+
+# Function to handle terminal resize
+handle_resize() {
+    # Need to redraw the screen when terminal is resized
+    get_current_state
+    display_system_info
+}
+
+# Function to handle cleanup on exit
+cleanup() {
+    # Show cursor and reset terminal
+    tput cnorm
+    tput sgr0
+    clear
+    echo "Monitor terminated."
+    exit 0
+}
+
+# Set up signal handlers
+trap cleanup SIGINT SIGTERM
+trap handle_resize SIGWINCH
+
+# Hide cursor
+tput civis
+
+# Main loop
+while true; do
+    get_current_state
+    display_system_info
+    sleep 1
+done
