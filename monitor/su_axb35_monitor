@@ -96,7 +96,7 @@ display_fan_info() {
     echo -e "  Speed: $(format_rpm ${axb35_vars[$rpm_idx]}) RPM"
     echo -e "  Mode:  $(format_mode ${axb35_vars[$mode_idx]})"
     
-    if [[ "${axb35_vars[$mode_idx]}" == "curve" ]]; then
+    if [[ "${axb35_vars[$mode_idx]}" == "auto" ]]; then
         echo -e "  Level: N/A"
     else
         echo -e "  Level: ${axb35_vars[$level_idx]}"
