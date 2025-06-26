@@ -18,7 +18,7 @@ usage() {
 Usage: $(basename "$0") [OPTIONS]
 
 OPTIONS:
-  -i SECONDS   Update interval (0.5-10 seconds, default: 1)
+  -i SECONDS   Update interval (0.3-10 seconds, default: 1)
   -j           Output current values in JSON and exit
   -r           Display raw values without additional processing
   -h, --help   Display this usage information
