@@ -64,7 +64,7 @@ format_temp() {
 format_mode() {
     local mode=$1
     case "$mode" in
-        "auto")  echo -e "${GREEN}${mode}${RESET}" ;;
+        "auto")  echo -e "${GREEN}${mode}${RESET} " ;;
         "fixed") echo -e "${YELLOW}${mode}${RESET}" ;;
         "curve") echo -e "${CYAN}${mode}${RESET}" ;;
         *) echo -e "${mode}" ;;
@@ -75,8 +75,8 @@ format_mode() {
 format_power_mode() {
     local mode=$1
     case "$mode" in
-        "quiet")       echo -e "${GREEN}${mode}${RESET}" ;;
-        "balanced")    echo -e "${YELLOW}${mode}${RESET}" ;;
+        "quiet")       echo -e "${GREEN}${mode}${RESET}      " ;;
+        "balanced")    echo -e "${YELLOW}${mode}${RESET}   " ;;
         "performance") echo -e "${RED}${mode}${RESET}" ;;
         *) echo -e "${mode}" ;;
     esac
@@ -93,7 +93,7 @@ display_fan_info() {
     local fan_name=$7
     
     echo -e "${BOLD}${fan_name}${RESET}"
-    echo -e "  Speed: $(format_rpm ${axb35_vars[$rpm_idx]}) RPM"
+    echo -e "  Speed: $(format_rpm ${axb35_vars[$rpm_idx]}) RPM "
     echo -e "  Mode:  $(format_mode ${axb35_vars[$mode_idx]})"
     
     if [[ "${axb35_vars[$mode_idx]}" == "auto" ]]; then
