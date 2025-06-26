@@ -116,7 +116,6 @@ display_fan_info() {
 display_system_info() {
     # Position cursor at top left
     tput cup 0 0
-    tput ed
     
     # Get terminal size
     local term_rows=$(tput lines)
@@ -167,7 +166,8 @@ display_system_info() {
 # Function to handle terminal resize
 handle_resize() {
     # Need to redraw the screen when terminal is resized
-    get_current_state
+    tput cup 0 0
+    tput ed
     display_system_info
 }
 
@@ -189,6 +189,7 @@ trap handle_resize SIGWINCH
 tput civis
 
 # Main loop
+handle_resize
 while true; do
     get_current_state
     display_system_info
