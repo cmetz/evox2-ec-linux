@@ -29,6 +29,7 @@
             cpio
             elfutils
             kernelPackages.kernel.dev
+            bear
           ];
 
           shellHook = ''
