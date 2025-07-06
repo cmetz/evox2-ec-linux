@@ -23,6 +23,8 @@ clean:
 .PHONY: install
 install: modules_install
 	depmod
+	@echo "Installing su_axb35_monitor script to /usr/local/bin/"
+	install -m 0755 scripts/su_axb35_monitor /usr/local/bin/
 
 .PHONY: uninstall
 uninstall:
@@ -32,5 +34,11 @@ uninstall:
 		depmod; \
 	else \
 		echo "Module not found."; \
+	fi
+	@if [ -f "/usr/local/bin/su_axb35_monitor" ]; then \
+		echo "Removing /usr/local/bin/su_axb35_monitor"; \
+		rm -v "/usr/local/bin/su_axb35_monitor"; \
+	else \
+		echo "Monitor script not found."; \
 	fi
 

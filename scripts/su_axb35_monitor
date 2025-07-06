@@ -7,10 +7,17 @@ if [[ "${BASH_VERSION%%.*}" -lt 4 ]]; then
     exit 1
 fi
 
-axb35_path=/sys/class/ec_su_axb35
+axb35_name=ec_su_axb35
+axb35_path=/sys/class/$axb35_name
 axb35_delay=1
 raw_mode=0
 declare -a axb35_vars
+
+# check if module is loaded and path exists
+if ! lsmod | grep -q "$axb35_name" || [ ! -d "$axb35_path" ]; then
+    echo "Error: Module '$axb35_name' is not loaded or not accessible"
+    exit 2
+fi
 
 # usage info
 usage() {
