@@ -9,15 +9,15 @@ default: modules
 
 .PHONY: modules
 modules:
-	$(MAKE) -C $(KERNEL_BUILD) M=$(PWD) modules
+	$(MAKE) -C $(KERNEL_BUILD) M=$(shell pwd) modules
 
 .PHONY: modules_install
 modules_install: modules
-	$(MAKE) -C $(KERNEL_BUILD) M=$(PWD) modules_install
+	$(MAKE) -C $(KERNEL_BUILD) M=$(shell pwd) modules_install
 
 .PHONY: clean
 clean:
-	$(MAKE) -C $(KERNEL_BUILD) M=$(PWD) clean
+	$(MAKE) -C $(KERNEL_BUILD) M=$(shell pwd) clean
 	rm -rf $(BUILD_DIR)
 
 .PHONY: install
